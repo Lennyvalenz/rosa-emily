@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#050507">
+<title>Para Emily</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#050507;color:#fff;font-family:Georgia,serif}
+  body{display:flex;align-items:center;justify-content:center}
+  canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+  .message{position:fixed;left:0;right:0;bottom:max(28px,env(safe-area-inset-bottom));text-align:center;padding:0 20px;pointer-events:none;opacity:0;transform:translateY(8px);transition:opacity 2s,transform 2s}
+  .message.show{opacity:1;transform:translateY(0)}
+  .message .name{font-size:clamp(27px,7vw,42px);letter-spacing:.16em;color:#ffd9df;text-shadow:0 0 18px #ff315f88}
+  .message .line{margin-top:9px;font-size:clamp(13px,3.6vw,17px);letter-spacing:.04em;color:#e8cbd2}
+  .hint{position:fixed;top:max(18px,env(safe-area-inset-top));left:0;right:0;text-align:center;color:#a99aa2;font:11px system-ui,sans-serif;letter-spacing:.18em;text-transform:uppercase;opacity:.7;pointer-events:none}
+  .replay{position:fixed;right:16px;bottom:max(16px,env(safe-area-inset-bottom));border:1px solid #ffffff35;background:#100d12cc;color:#f7dce2;border-radius:999px;padding:10px 15px;font:12px system-ui,sans-serif;opacity:0;transition:opacity 1s;cursor:pointer}
+  .replay.show{opacity:.85}
+</style>
+</head>
+<body>
+<canvas id="scene" aria-label="Para mi preciosa mujer Emily <3 "></canvas>
+<div class="hint" id="hint">Con cariño, tu guayaba <3 </div>
+<div class="message" id="message"><div class="name">EMILY</div><div class="line">Te quiero preciosa <3 </div></div>
+<button class="replay" id="replay">Volver a ver</button>
+<script>
+(() => {
+  const canvas = document.getElementById('scene');
+  const ctx = canvas.getContext('2d');
+  const message = document.getElementById('message');
+  const replay = document.getElementById('replay');
+  const hint = document.getElementById('hint');
+  let w, h, dpr, points = [], stars = [], start = performance.now(), raf;
+  const letters = 'EMILY';
+  const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
+  function resize(){
+    dpr = Math.min(devicePixelRatio || 1, 2);
+    w = innerWidth; h = innerHeight;
+    canvas.width = Math.round(w*dpr); canvas.height = Math.round(h*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    makeScene();
+  }
+  // === FUNCIÓN EXACTA A LA ROSA DEL VIDEO ===
+  // espiral con 5 vueltas + pétalos más gruesos y curvos
+  function rosePoint(t, scale){
+    const r = Math.cos(5 * t);
+    return {x: Math.sin(t) * r * scale, y: -Math.cos(t) * r * scale};
+  }
+  function makeScene(){
+    points = []; stars = [];
+    const cx = w/2, cy = h*.43;
+    const unit = Math.min(w,h) * .30;
+    // Pétalos (ahora con forma exacta de la rosa del video)
+    const count = 1550;
+    for(let i=0; i<count; i++){
+      const t = (i/count) * Math.PI * 2 * 5;
+      const p = rosePoint(t, 1);
+      const layer = i % 5;
+      const jitter = (Math.sin(i*91.7)*.5 + Math.cos(i*17.3)*.5) * .035;
+      const x = cx + (p.x + jitter) * unit;
+      const y = cy + (p.y + jitter) * unit * .88;
+      points.push({x,y,delay:(i/count)*.58 + layer*.012, size: 9 + (i%4)*.55, char:letters[i%letters.length], hue:340+(i%7)*2});
+    }
+    // Talos (verde fuerte)
+    const stemBottom = Math.min(h*.91, cy + unit*1.72);
+    const stemTop = cy + unit*.35;
+    for(let i=0; i<430; i++){
+      const f = i/429;
+      const y = stemTop + f * (stemBottom - stemTop);
+      const sway = Math.sin(f*5) * unit*.035;
+      points.push({x: cx + sway + (Math.sin(i*12.3)*2), y, delay:.43 + f*.37, size:9, char:letters[i%5], kind:'stem'});
+    }
+    // Hojas curvas
+    for(let side of [-1,1]){
+      for(let i=0; i<180; i++){
+        const f = i/179;
+        const x = cx + side * (unit*.05 + f * unit*.53);
+        const y = cy + unit*(.92 + Math.sin(f*Math.PI)*-0.24) + f*unit*.22;
+        points.push({x: x + Math.sin(i*.7)*2, y: y + Math.cos(i*.3)*2, delay:.62 + f*.18, size:9, char:letters[(i+2)%5], kind:'leaf'});
+      }
+    }
+    for(let i=0; i<100; i++){
+      stars.push({x:Math.random()*w, y:Math.random()*h, r:Math.random()*1.5+.35, phase:Math.random()*Math.PI*2, speed:.4+Math.random()*1.3});
+    }
+  }
+  function draw(now){
+    const elapsed = (now - start)/1000;
+    ctx.clearRect(0,0,w,h);
+    const halo = ctx.createRadialGradient(w/2, h*.43,2, w/2, h*.43, Math.min(w,h)*.58);
+    halo.addColorStop(0,'rgba(100,14,39,.19)'); halo.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=halo; ctx.fillRect(0,0,w,h);
+    for(const s of stars){
+      const a = .18 + .42*(.5 + .5*Math.sin(now*.001*s.speed + s.phase));
+      ctx.globalAlpha = a; ctx.fillStyle='#ffe8ef'; ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    const progress = clamp(elapsed/8.2, 0, 1);
+    for(const p of points){
+      const local = clamp((progress - p.delay)/.22, 0, 1);
+      if(local <= 0) continue;
+      let color, glow;
+      if(p.kind === 'stem'){ color='#76d68a'; glow='#48ff8b'; }
+      else if(p.kind === 'leaf'){ color='#9de6a1'; glow='#58ff93'; }
+      else { color = `hsl(${p.hue} 92% 72%)`; glow='#ff315f'; }
+      ctx.globalAlpha = local * (.72 + .28*Math.sin(now*.003 + p.x*.03));
+      ctx.font = `${p.size}px Georgia,serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.shadowColor = glow; ctx.shadowBlur = p.kind ? 7 : 10;
+      ctx.fillStyle = color;
+      ctx.fillText(p.char, p.x, p.y);
+    }
+    ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    // Brillo central (se activa al 70% como en el video)
+    if(progress > .7){
+      const a = (progress - .7)/.3;
+      ctx.globalAlpha = .12 + .12*Math.sin(now*.002);
+      const g = ctx.createRadialGradient(w/2, h*.42,0, w/2, h*.42, Math.min(w,h)*.22);
+      g.addColorStop(0,'#ff7899'); g.addColorStop(1,'transparent');
+      ctx.fillStyle = g; ctx.fillRect(0,0,w,h);
+      ctx.globalAlpha = 1;
+    }
+    if(progress >= 1){
+      message.classList.add('show'); replay.classList.add('show'); hint.style.opacity='0';
+    } else {
+      message.classList.remove('show'); replay.classList.remove('show'); hint.style.opacity='.7';
+    }
+    raf = requestAnimationFrame(draw);
+  }
+  function restart(){
+    cancelAnimationFrame(raf); start = performance.now();
+    message.classList.remove('show'); replay.classList.remove('show'); hint.style.opacity='.7';
+    raf = requestAnimationFrame(draw);
+  }
+  replay.addEventListener('click', restart);
+  canvas.addEventListener('click', ()=>{if((performance.now()-start)/1000 > 8.2) restart();});
+  addEventListener('resize', resize, {passive:true});
+  resize(); restart();
+})();
+</script>
+</body>
+</html>
